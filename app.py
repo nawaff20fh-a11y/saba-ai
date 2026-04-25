@@ -1,77 +1,36 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+mport streamlit as st
 import joblib
-import pandas as pd
+import numpy as np
 
-app = Flask(__name__)
-CORS(app)
+st.set_page_config(page_title="SABA AI", layout="centered")
 
+st.title("🧠 SABA – Smart ABA Assistant")
+
+st.write("أدخل بيانات الجلسة وسيعطيك النظام القرار المناسب 👇")
+
+# Inputs
+age = st.number_input("عمر الطفل", min_value=2, max_value=18, value=5)
+task_difficulty = st.slider("صعوبة المهمة", 1, 5, 3)
+sleep_quality = st.slider("جودة النوم", 1, 5, 3)
+hunger_level = st.slider("مستوى الجوع", 1, 5, 2)
+sensory_load = st.slider("الضغط الحسي", 1, 5, 3)
+refusal_count = st.number_input("عدد مرات الرفض", 0, 20, 2)
+leaving_seat = st.number_input("ترك الكرسي", 0, 20, 1)
+distraction = st.slider("التشتت", 1, 5, 3)
+
+# Load model
 model = joblib.load("saba_behavior_model.pkl")
 
-@app.route("/")
-def home():
-    return "SABA AI Model is Running"
-
-@app.route("/predict", methods=["POST", "OPTIONS"])
-def predict():
-    if request.method == "OPTIONS":
-        return jsonify({"status": "ok"}), 200
-
-    data = request.get_json()
-
-    input_data = pd.DataFrame([{
-        "session_minute": data["session_minute"],
-        "task_difficulty": data["task_difficulty"],
-        "sleep_quality": data["sleep_quality"],
-        "hunger_level": data["hunger_level"],
-        "sensory_load": data["sensory_load"],
-        "preferred_items_available": data["preferred_items_available"],
-        "refusal_count": data["refusal_count"],
-        "leaving_seat_count": data["leaving_seat_count"]
-    }])
+# Predict
+if st.button("🔍 تحليل القرار"):
+    input_data = np.array([[age, task_difficulty, sleep_quality, hunger_level,
+                            sensory_load, refusal_count, leaving_seat, distraction]])
 
     prediction = model.predict(input_data)[0]
-    probabilities = model.predict_proba(input_data)[0]
-    confidence = round(max(probabilities) * 100, 1)
-
-    reasons = []
-
-    if data["refusal_count"] >= 3:
-        reasons.append("ارتفاع عدد مرات الرفض")
-
-    if data["leaving_seat_count"] >= 2:
-        reasons.append("زيادة ترك الكرسي أو الحركة")
-
-    if data["task_difficulty"] >= 3:
-        reasons.append("صعوبة المهمة مرتفعة")
-
-    if data["hunger_level"] >= 3:
-        reasons.append("مستوى الجوع مرتفع")
-
-    if data["sensory_load"] >= 3:
-        reasons.append("الضغط الحسي مرتفع")
-
-    if data["sleep_quality"] >= 3:
-        reasons.append("جودة النوم ضعيفة")
-
-    if data["preferred_items_available"] >= 3:
-        reasons.append("المعززات ضعيفة أو غير كافية")
-
-    reason_text = " + ".join(reasons) if reasons else "المؤشرات الحالية مستقرة"
 
     if prediction == "give_break":
-        recommendation = "يوصى بإعطاء بريك قصير ثم العودة للمهمة بشكل تدريجي."
+        st.error("🛑 الطفل يحتاج بريك الآن")
     elif prediction == "change_activity":
-        recommendation = "يوصى بتعديل النشاط أو تقليل صعوبته واستخدام معزز مناسب."
+        st.warning("🔄 يفضل تغيير النشاط")
     else:
-        recommendation = "يمكن الاستمرار في الجلسة مع مراقبة المؤشرات السلوكية."
-
-    return jsonify({
-        "decision": prediction,
-        "confidence": confidence,
-        "reason": reason_text,
-        "recommendation": recommendation
-    })
-
-if __name__ == "__main__":
-    app.run(debug=True)
+        st.success("✅ كمل الجلسة")

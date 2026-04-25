@@ -6,64 +6,65 @@ model = joblib.load("saba_behavior_model.pkl")
 
 st.set_page_config(
     page_title="SABA",
-    page_icon="SABA",
     layout="centered"
 )
 
+# 🔥 إزالة شعار Streamlit
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# ====== تصميم ======
 st.markdown("""
 <style>
 .stApp {
     background: #f4f7fb;
     direction: rtl;
 }
+
 .main-card {
     background: linear-gradient(135deg, #0f172a, #1e40af);
     padding: 28px;
     border-radius: 28px;
     color: white;
     margin-bottom: 22px;
-    box-shadow: 0 18px 40px rgba(30,64,175,0.25);
 }
+
 .card {
     background: white;
     padding: 24px;
     border-radius: 26px;
-    box-shadow: 0 14px 35px rgba(15,23,42,0.08);
     margin-bottom: 18px;
 }
-.title {
-    font-size: 30px;
-    font-weight: 800;
-}
-.subtitle {
-    color: #dbeafe;
-    font-size: 15px;
-    line-height: 1.8;
-}
+
 .result-box {
     background: white;
     padding: 24px;
     border-radius: 26px;
-    box-shadow: 0 14px 35px rgba(15,23,42,0.08);
     text-align: center;
 }
 </style>
 """, unsafe_allow_html=True)
 
+# ====== الهيدر ======
 st.markdown("""
 <div class="main-card">
-    <div class="title">SABA</div>
+    <h1>SABA</h1>
     <h3>Smart ABA Assistant</h3>
-    <p class="subtitle">نظام ذكي يساعد الأخصائي على تحليل بيانات الجلسة واقتراح القرار المناسب.</p>
+    <p>نظام ذكي يساعد الأخصائي على تحليل بيانات الجلسة واتخاذ القرار المناسب</p>
 </div>
 """, unsafe_allow_html=True)
 
+# ====== الإدخال ======
 st.markdown('<div class="card">', unsafe_allow_html=True)
-st.subheader("بيانات الجلسة")
 
-session_minute = st.number_input("مدة العمل بالدقائق", min_value=0, max_value=120, value=10, step=1)
-refusal_count = st.number_input("عدد مرات الرفض", min_value=0, max_value=20, value=0, step=1)
-leaving_seat_count = st.number_input("عدد مرات ترك الكرسي", min_value=0, max_value=20, value=0, step=1)
+session_minute = st.number_input("مدة العمل (دقائق)", 0, 120, 10)
+refusal_count = st.number_input("عدد مرات الرفض", 0, 20, 0)
+leaving_seat_count = st.number_input("عدد مرات ترك الكرسي", 0, 20, 0)
 
 task_difficulty_label = st.selectbox("صعوبة المهمة", ["منخفضة", "متوسطة", "مرتفعة"])
 hunger_label = st.selectbox("مستوى الجوع", ["منخفض", "متوسط", "مرتفع"])
@@ -81,7 +82,9 @@ analyze = st.button("تحليل الحالة", use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+# ====== التحليل ======
 if analyze:
+
     input_data = pd.DataFrame([{
         "session_minute": session_minute,
         "task_difficulty": task_difficulty,
@@ -94,50 +97,40 @@ if analyze:
     }])
 
     prediction = model.predict(input_data)[0]
-    probabilities = model.predict_proba(input_data)[0]
-    confidence = round(max(probabilities) * 100, 1)
+    confidence = round(max(model.predict_proba(input_data)[0]) * 100, 1)
 
     reasons = []
+    if refusal_count >= 3: reasons.append("ارتفاع الرفض")
+    if leaving_seat_count >= 2: reasons.append("زيادة الحركة")
+    if sensory_load >= 3: reasons.append("ضغط حسي مرتفع")
+    if hunger_level >= 3: reasons.append("جوع مرتفع")
+    if sleep_quality >= 3: reasons.append("نوم ضعيف")
 
-    if refusal_count >= 3:
-        reasons.append("ارتفاع عدد مرات الرفض")
-    if leaving_seat_count >= 2:
-        reasons.append("زيادة ترك الكرسي أو الحركة")
-    if task_difficulty >= 3:
-        reasons.append("صعوبة المهمة مرتفعة")
-    if hunger_level >= 3:
-        reasons.append("مستوى الجوع مرتفع")
-    if sensory_load >= 3:
-        reasons.append("الضغط الحسي مرتفع")
-    if sleep_quality >= 3:
-        reasons.append("جودة النوم ضعيفة")
-    if preferred_items_available >= 3:
-        reasons.append("المعززات ضعيفة أو غير كافية")
-
-    reason_text = " + ".join(reasons) if reasons else "المؤشرات الحالية مستقرة"
+    reason_text = " + ".join(reasons) if reasons else "المؤشرات مستقرة"
 
     st.markdown('<div class="result-box">', unsafe_allow_html=True)
 
     if prediction == "give_break":
         st.error("إعطاء استراحة")
-        recommendation = "يوصى بإعطاء بريك قصير ثم العودة للمهمة بشكل تدريجي."
+        recommendation = "اعطاء بريك ثم العودة تدريجياً"
     elif prediction == "change_activity":
         st.warning("تعديل النشاط")
-        recommendation = "يوصى بتعديل النشاط أو تقليل صعوبته واستخدام معزز مناسب."
+        recommendation = "تغيير النشاط أو تقليل صعوبته"
     else:
         st.success("استمرار الجلسة")
-        recommendation = "يمكن الاستمرار في الجلسة مع مراقبة المؤشرات السلوكية."
+        recommendation = "يمكن الاستمرار مع المراقبة"
 
-    st.info(f"سبب القرار: {reason_text}")
+    st.info(f"السبب: {reason_text}")
     st.success(f"التوصية: {recommendation}")
     st.metric("ثقة المودل", f"{confidence}%")
     st.progress(confidence / 100)
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 else:
     st.markdown("""
     <div class="result-box">
         <h3>القرار المقترح</h3>
-        <p>أدخل بيانات الجلسة ثم اضغط تحليل الحالة.</p>
+        <p>أدخل البيانات ثم اضغط تحليل الحالة</p>
     </div>
     """, unsafe_allow_html=True)
